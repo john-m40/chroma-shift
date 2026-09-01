@@ -1,0 +1,15 @@
+[package]
+name = "chroma-shift"
+version = "0.1.0"
+edition = "2021"
+authors = ["john-m40"]
+license = "MIT"
+description = "Convert colours between sRGB, XYZ and CIE Lab"
+
+[[bin]]
+name = "chroma-shift"
+path = "src/main.rs"
+
+[lib]
+name = "chroma_shift"
+path = "src/lib.rs"
