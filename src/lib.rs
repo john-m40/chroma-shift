@@ -257,6 +257,21 @@ mod tests {
     }
 
     #[test]
+    fn matches_readme_worked_example() {
+        // Pins the numbers quoted in the README's CLI walkthrough for
+        // "#3366cc" so a future formula tweak can't silently make the
+        // docs wrong again without a test failing here too.
+        let lab = Rgb::from_hex("#3366cc").unwrap().to_xyz().to_lab();
+        let xyz = Rgb::from_hex("#3366cc").unwrap().to_xyz();
+        assert!((xyz.x - 0.1701).abs() < 0.0001);
+        assert!((xyz.y - 0.1456).abs() < 0.0001);
+        assert!((xyz.z - 0.5903).abs() < 0.0001);
+        assert!((lab.l - 45.03).abs() < 0.01);
+        assert!((lab.a - 18.71).abs() < 0.01);
+        assert!((lab.b - (-57.85)).abs() < 0.01);
+    }
+
+    #[test]
     fn rejects_bad_hex() {
         assert!(Rgb::from_hex("#abc").is_err());
         assert!(Rgb::from_hex("nothex1").is_err());

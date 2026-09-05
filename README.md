@@ -30,10 +30,10 @@ println!("L*={:.1} a*={:.1} b*={:.1}", lab.l, lab.a, lab.b);
 ```
 $ chroma-shift '#3366cc'
 hex: #3366cc
-xyz: 0.1938 0.1729 0.5163
-lab: 48.44 8.98 -46.68
+xyz: 0.1701 0.1456 0.5903
+lab: 45.03 18.71 -57.85
 
-$ chroma-shift lab 48.44 8.98 -46.68
+$ chroma-shift lab 45.03 18.71 -57.85
 hex: #3366cc
 
 $ chroma-shift diff '#000000' '#808080'
