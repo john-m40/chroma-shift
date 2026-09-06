@@ -23,7 +23,16 @@ use chroma_shift::Rgb;
 let rgb = Rgb::from_hex("#3366cc").unwrap();
 let lab = rgb.to_xyz().to_lab();
 println!("L*={:.1} a*={:.1} b*={:.1}", lab.l, lab.a, lab.b);
+
+let hsl = rgb.to_hsl();
+println!("hsl({:.0} {:.0}% {:.0}%)", hsl.h, hsl.s * 100.0, hsl.l * 100.0);
 ```
+
+`Rgb::to_hsl` / `Rgb::to_hsv` and their `to_rgb` inverses match the CSS
+`hsl()`/`hsv()` model. They're not perceptually uniform - hue, saturation and
+lightness/value don't correspond to equal steps in how different colours
+look - so they're an on-ramp for people arriving with CSS colours, not a
+replacement for Lab when you actually need to measure colour difference.
 
 ## CLI usage
 
@@ -59,8 +68,7 @@ crates, so there's nothing to fetch.
 
 ## Status
 
-First cut. Handles sRGB/XYZ/Lab round trips and both CIE76 and CIEDE2000
-delta-E. Still missing: a gamut clipping warning when Lab -> RGB falls
-outside 0..1, HSL/HSV as an on-ramp for people coming from CSS, 3-digit and
-8-digit (alpha) hex input, and a palette command for perceptually even
-colour ramps.
+First cut. Handles sRGB/XYZ/Lab round trips, both CIE76 and CIEDE2000
+delta-E, and HSL/HSV conversions. Still missing: a gamut clipping warning
+when Lab -> RGB falls outside 0..1, 3-digit and 8-digit (alpha) hex input,
+and a palette command for perceptually even colour ramps.

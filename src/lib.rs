@@ -29,6 +29,58 @@ pub struct Lab {
     pub b: f64,
 }
 
+/// Hue in degrees (0..360), saturation and lightness in 0.0..=1.0. Matches
+/// the CSS `hsl()` model, not a perceptual space - it's here as an on-ramp
+/// for people arriving with CSS colours, not as a substitute for Lab.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Hsl {
+    pub h: f64,
+    pub s: f64,
+    pub l: f64,
+}
+
+/// Hue in degrees (0..360), saturation and value in 0.0..=1.0.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Hsv {
+    pub h: f64,
+    pub s: f64,
+    pub v: f64,
+}
+
+/// Shared by `Rgb::to_hsl` and `Rgb::to_hsv`: the hue angle only depends on
+/// which channel is max and the chroma (max - min), not on lightness/value,
+/// so both conversions can reuse the same six-way split.
+fn rgb_hue_degrees(r: f64, g: f64, b: f64, max: f64, chroma: f64) -> f64 {
+    let h = if max == r {
+        60.0 * ((g - b) / chroma)
+    } else if max == g {
+        60.0 * ((b - r) / chroma + 2.0)
+    } else {
+        60.0 * ((r - g) / chroma + 4.0)
+    };
+    if h < 0.0 { h + 360.0 } else { h }
+}
+
+/// Shared by `Hsl::to_rgb` and `Hsv::to_rgb`: given chroma and an
+/// intermediate value `x`, place them into the RGB channel that the hue's
+/// 60-degree sector says should hold the peak.
+fn hue_sector_to_rgb(h: f64, c: f64, x: f64) -> (f64, f64, f64) {
+    let hp = h / 60.0;
+    if hp < 1.0 {
+        (c, x, 0.0)
+    } else if hp < 2.0 {
+        (x, c, 0.0)
+    } else if hp < 3.0 {
+        (0.0, c, x)
+    } else if hp < 4.0 {
+        (0.0, x, c)
+    } else if hp < 5.0 {
+        (x, 0.0, c)
+    } else {
+        (c, 0.0, x)
+    }
+}
+
 impl Rgb {
     pub fn from_hex(s: &str) -> Result<Rgb, String> {
         let s = s.trim().trim_start_matches('#');
@@ -84,6 +136,35 @@ impl Rgb {
             z: r * 0.0193339 + g * 0.1191920 + b * 0.9503041,
         }
     }
+
+    pub fn to_hsl(self) -> Hsl {
+        let (r, g, b) = (self.r, self.g, self.b);
+        let max = r.max(g).max(b);
+        let min = r.min(g).min(b);
+        let l = (max + min) / 2.0;
+        let chroma = max - min;
+        if chroma == 0.0 {
+            return Hsl { h: 0.0, s: 0.0, l };
+        }
+        let s = if l > 0.5 {
+            chroma / (2.0 - max - min)
+        } else {
+            chroma / (max + min)
+        };
+        Hsl { h: rgb_hue_degrees(r, g, b, max, chroma), s, l }
+    }
+
+    pub fn to_hsv(self) -> Hsv {
+        let (r, g, b) = (self.r, self.g, self.b);
+        let max = r.max(g).max(b);
+        let min = r.min(g).min(b);
+        let chroma = max - min;
+        let s = if max == 0.0 { 0.0 } else { chroma / max };
+        if chroma == 0.0 {
+            return Hsv { h: 0.0, s, v: max };
+        }
+        Hsv { h: rgb_hue_degrees(r, g, b, max, chroma), s, v: max }
+    }
 }
 
 impl Xyz {
@@ -111,6 +192,29 @@ impl Xyz {
             a: 500.0 * (fx - fy),
             b: 200.0 * (fy - fz),
         }
+    }
+}
+
+impl Hsl {
+    pub fn to_rgb(self) -> Rgb {
+        if self.s == 0.0 {
+            return Rgb { r: self.l, g: self.l, b: self.l };
+        }
+        let c = (1.0 - (2.0 * self.l - 1.0).abs()) * self.s;
+        let x = c * (1.0 - (self.h / 60.0 % 2.0 - 1.0).abs());
+        let m = self.l - c / 2.0;
+        let (r, g, b) = hue_sector_to_rgb(self.h, c, x);
+        Rgb { r: r + m, g: g + m, b: b + m }
+    }
+}
+
+impl Hsv {
+    pub fn to_rgb(self) -> Rgb {
+        let c = self.v * self.s;
+        let x = c * (1.0 - (self.h / 60.0 % 2.0 - 1.0).abs());
+        let m = self.v - c;
+        let (r, g, b) = hue_sector_to_rgb(self.h, c, x);
+        Rgb { r: r + m, g: g + m, b: b + m }
     }
 }
 
@@ -269,6 +373,48 @@ mod tests {
         assert!((lab.l - 45.03).abs() < 0.01);
         assert!((lab.a - 18.71).abs() < 0.01);
         assert!((lab.b - (-57.85)).abs() < 0.01);
+    }
+
+    #[test]
+    fn hsl_hsv_match_known_values() {
+        // CSS reference values for pure red, and the classic "sea green"
+        // example (#2e8b57) that most HSL/HSV write-ups use to sanity-check
+        // a non-primary colour.
+        let red = Rgb::from_hex("#ff0000").unwrap();
+        let hsl = red.to_hsl();
+        assert!((hsl.h - 0.0).abs() < 0.01);
+        assert!((hsl.s - 1.0).abs() < 0.01);
+        assert!((hsl.l - 0.5).abs() < 0.01);
+        let hsv = red.to_hsv();
+        assert!((hsv.h - 0.0).abs() < 0.01);
+        assert!((hsv.s - 1.0).abs() < 0.01);
+        assert!((hsv.v - 1.0).abs() < 0.01);
+
+        let sea_green = Rgb::from_hex("#2e8b57").unwrap();
+        let hsl = sea_green.to_hsl();
+        assert!((hsl.h - 146.45).abs() < 0.01);
+        assert!((hsl.s - 0.5027).abs() < 0.001);
+        assert!((hsl.l - 0.3627).abs() < 0.001);
+        let hsv = sea_green.to_hsv();
+        assert!((hsv.h - 146.45).abs() < 0.01);
+        assert!((hsv.s - 0.6691).abs() < 0.001);
+        assert!((hsv.v - 0.5451).abs() < 0.001);
+    }
+
+    #[test]
+    fn hsl_hsv_are_achromatic_for_grey() {
+        let grey = Rgb::from_hex("#808080").unwrap();
+        assert_eq!(grey.to_hsl().s, 0.0);
+        assert_eq!(grey.to_hsv().s, 0.0);
+    }
+
+    #[test]
+    fn hsl_hsv_round_trip_through_rgb() {
+        for hex in ["#3366cc", "#2e8b57", "#ffcc00", "#ff0080", "#000000", "#ffffff"] {
+            let orig = Rgb::from_hex(hex).unwrap();
+            assert_eq!(orig.to_hsl().to_rgb().to_hex(), orig.to_hex());
+            assert_eq!(orig.to_hsv().to_rgb().to_hex(), orig.to_hex());
+        }
     }
 
     #[test]
