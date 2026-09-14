@@ -115,9 +115,14 @@ impl Rgb {
         })
     }
 
+    /// Applies the sRGB transfer function without clamping first, so an
+    /// out-of-range linear input (as happens when a Lab colour outside the
+    /// sRGB gamut is converted back) produces a component outside 0.0..=1.0
+    /// instead of silently losing that information to a premature clamp.
+    /// `is_out_of_gamut` relies on that to tell the caller something got
+    /// clipped; `to_hex` does the actual clamping once, at the display edge.
     fn from_linear(lin: [f64; 3]) -> Rgb {
         let enc = lin.map(|c| {
-            let c = c.clamp(0.0, 1.0);
             if c <= 0.0031308 {
                 c * 12.92
             } else {
@@ -125,6 +130,14 @@ impl Rgb {
             }
         });
         Rgb { r: enc[0], g: enc[1], b: enc[2] }
+    }
+
+    /// True if this colour falls outside the displayable sRGB cube, i.e.
+    /// `to_hex` will have to clip it. Only meaningful for an `Rgb` produced
+    /// by converting down from XYZ/Lab - a colour built via `from_hex` or
+    /// literal fields in 0.0..=1.0 is in gamut by construction.
+    pub fn is_out_of_gamut(self) -> bool {
+        [self.r, self.g, self.b].iter().any(|&c| c < 0.0 || c > 1.0)
     }
 
     pub fn to_xyz(self) -> Xyz {
@@ -415,6 +428,19 @@ mod tests {
             assert_eq!(orig.to_hsl().to_rgb().to_hex(), orig.to_hex());
             assert_eq!(orig.to_hsv().to_rgb().to_hex(), orig.to_hex());
         }
+    }
+
+    #[test]
+    fn detects_out_of_gamut_lab() {
+        // In-gamut round trip: any real sRGB colour stays in 0.0..=1.0.
+        let in_gamut = Rgb::from_hex("#3366cc").unwrap().to_xyz().to_rgb();
+        assert!(!in_gamut.is_out_of_gamut());
+
+        // L*=100 is pure white: there's no headroom left to add chroma
+        // without a channel overshooting 1.0, so any a*/b* away from zero
+        // at max lightness is guaranteed to be out of gamut.
+        let out_of_gamut = Lab { l: 100.0, a: 50.0, b: 0.0 }.to_xyz().to_rgb();
+        assert!(out_of_gamut.is_out_of_gamut());
     }
 
     #[test]

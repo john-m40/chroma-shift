@@ -26,6 +26,11 @@ println!("L*={:.1} a*={:.1} b*={:.1}", lab.l, lab.a, lab.b);
 
 let hsl = rgb.to_hsl();
 println!("hsl({:.0} {:.0}% {:.0}%)", hsl.h, hsl.s * 100.0, hsl.l * 100.0);
+
+// Not every Lab colour has an sRGB equivalent - `to_hex` clips silently,
+// so check first if you need to know.
+let vivid = chroma_shift::Lab { l: 100.0, a: 50.0, b: 0.0 }.to_xyz().to_rgb();
+assert!(vivid.is_out_of_gamut());
 ```
 
 `Rgb::to_hsl` / `Rgb::to_hsv` and their `to_rgb` inverses match the CSS
@@ -44,6 +49,10 @@ lab: 45.03 18.71 -57.85
 
 $ chroma-shift lab 45.03 18.71 -57.85
 hex: #3366cc
+
+$ chroma-shift lab 100 50 0
+hex: #ffd9ff
+warning: outside sRGB gamut, clipped to nearest displayable colour
 
 $ chroma-shift diff '#000000' '#808080'
 delta-E76:   53.584
@@ -69,6 +78,6 @@ crates, so there's nothing to fetch.
 ## Status
 
 First cut. Handles sRGB/XYZ/Lab round trips, both CIE76 and CIEDE2000
-delta-E, and HSL/HSV conversions. Still missing: a gamut clipping warning
-when Lab -> RGB falls outside 0..1, 3-digit and 8-digit (alpha) hex input,
-and a palette command for perceptually even colour ramps.
+delta-E, HSL/HSV conversions, and warns on the CLI when a Lab colour falls
+outside the sRGB gamut. Still missing: 3-digit and 8-digit (alpha) hex
+input, and a palette command for perceptually even colour ramps.

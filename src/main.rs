@@ -27,7 +27,11 @@ fn run(args: &[String]) -> Result<String, String> {
             let parse = |s: &str| s.parse::<f64>().map_err(|e| format!("bad number {:?}: {}", s, e));
             let lab = Lab { l: parse(l)?, a: parse(a)?, b: parse(b)? };
             let rgb = lab.to_xyz().to_rgb();
-            Ok(format!("hex: {}", rgb.to_hex()))
+            let mut out = format!("hex: {}", rgb.to_hex());
+            if rgb.is_out_of_gamut() {
+                out.push_str("\nwarning: outside sRGB gamut, clipped to nearest displayable colour");
+            }
+            Ok(out)
         }
         [cmd, hex1, hex2] if cmd == "diff" => {
             let lab1 = Rgb::from_hex(hex1)?.to_xyz().to_lab();
