@@ -3,7 +3,7 @@ use std::env;
 use std::process::ExitCode;
 
 fn usage() -> String {
-    "usage:\n  chroma-shift <#rrggbb>              show xyz + lab for a hex colour\n  chroma-shift lab <L> <a> <b>        show the closest hex colour for a lab triple\n  chroma-shift diff <#rrggbb> <#rrggbb>  dE76 and dE2000 between two colours".to_string()
+    "usage:\n  chroma-shift <hex>                  show xyz + lab for a hex colour (#rgb, #rrggbb or #rrggbbaa)\n  chroma-shift lab <L> <a> <b>        show the closest hex colour for a lab triple\n  chroma-shift diff <#rrggbb> <#rrggbb>  dE76 and dE2000 between two colours".to_string()
 }
 
 fn run(args: &[String]) -> Result<String, String> {

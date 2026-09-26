@@ -82,21 +82,36 @@ fn hue_sector_to_rgb(h: f64, c: f64, x: f64) -> (f64, f64, f64) {
 }
 
 impl Rgb {
+    /// Accepts `#rgb`, `#rrggbb` and `#rrggbbaa`, with or without the `#`.
+    /// The 3-digit form is the CSS shorthand (each digit doubled); the
+    /// trailing alpha byte in the 8-digit form is validated as hex but
+    /// otherwise dropped, since nothing downstream of `Rgb` - XYZ, Lab,
+    /// delta-E - has a notion of transparency to carry it through.
     pub fn from_hex(s: &str) -> Result<Rgb, String> {
         let s = s.trim().trim_start_matches('#');
-        if s.len() != 6 {
-            return Err(format!("expected 6 hex digits, got {:?}", s));
-        }
+        let expanded;
+        let digits = match s.len() {
+            3 => {
+                expanded = s.chars().flat_map(|c| [c, c]).collect::<String>();
+                expanded.as_str()
+            }
+            6 | 8 => s,
+            _ => return Err(format!("expected 3, 6 or 8 hex digits, got {:?}", s)),
+        };
         let byte = |i: usize| -> Result<f64, String> {
-            u8::from_str_radix(&s[i..i + 2], 16)
+            u8::from_str_radix(&digits[i..i + 2], 16)
                 .map(|v| v as f64 / 255.0)
                 .map_err(|e| format!("bad hex digit at {}: {}", i, e))
         };
-        Ok(Rgb {
+        let rgb = Rgb {
             r: byte(0)?,
             g: byte(2)?,
             b: byte(4)?,
-        })
+        };
+        if digits.len() == 8 {
+            byte(6)?;
+        }
+        Ok(rgb)
     }
 
     pub fn to_hex(self) -> String {
@@ -445,8 +460,25 @@ mod tests {
 
     #[test]
     fn rejects_bad_hex() {
-        assert!(Rgb::from_hex("#abc").is_err());
+        assert!(Rgb::from_hex("#ab").is_err());
         assert!(Rgb::from_hex("nothex1").is_err());
+        assert!(Rgb::from_hex("#3366cg").is_err());
+    }
+
+    #[test]
+    fn shorthand_hex_doubles_each_digit() {
+        assert_eq!(Rgb::from_hex("#abc").unwrap(), Rgb::from_hex("#aabbcc").unwrap());
+        assert_eq!(Rgb::from_hex("f00").unwrap(), Rgb::from_hex("#ff0000").unwrap());
+    }
+
+    #[test]
+    fn eight_digit_hex_drops_alpha_but_keeps_colour() {
+        let with_alpha = Rgb::from_hex("#3366ccff").unwrap();
+        let without = Rgb::from_hex("#3366cc").unwrap();
+        assert_eq!(with_alpha, without);
+
+        // Alpha byte still has to be valid hex, even though it's discarded.
+        assert!(Rgb::from_hex("#3366ccgg").is_err());
     }
 
     #[test]

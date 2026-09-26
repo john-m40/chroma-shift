@@ -79,5 +79,7 @@ crates, so there's nothing to fetch.
 
 First cut. Handles sRGB/XYZ/Lab round trips, both CIE76 and CIEDE2000
 delta-E, HSL/HSV conversions, and warns on the CLI when a Lab colour falls
-outside the sRGB gamut. Still missing: 3-digit and 8-digit (alpha) hex
-input, and a palette command for perceptually even colour ramps.
+outside the sRGB gamut. `from_hex` accepts `#rgb`, `#rrggbb` and
+`#rrggbbaa` - the alpha byte is validated but dropped, since nothing in
+the colour model carries transparency through. Still missing: a palette
+command for perceptually even colour ramps.
