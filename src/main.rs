@@ -1,9 +1,9 @@
-use chroma_shift::{Lab, Rgb};
+use chroma_shift::{palette, Lab, Rgb};
 use std::env;
 use std::process::ExitCode;
 
 fn usage() -> String {
-    "usage:\n  chroma-shift <hex>                  show xyz + lab for a hex colour (#rgb, #rrggbb or #rrggbbaa)\n  chroma-shift lab <L> <a> <b>        show the closest hex colour for a lab triple\n  chroma-shift diff <#rrggbb> <#rrggbb>  dE76 and dE2000 between two colours".to_string()
+    "usage:\n  chroma-shift <hex>                  show xyz + lab for a hex colour (#rgb, #rrggbb or #rrggbbaa)\n  chroma-shift lab <L> <a> <b>        show the closest hex colour for a lab triple\n  chroma-shift diff <#rrggbb> <#rrggbb>  dE76 and dE2000 between two colours\n  chroma-shift palette <hex> <hex> <n>  n colours evenly spaced in Lab between two colours (2..=256)".to_string()
 }
 
 fn run(args: &[String]) -> Result<String, String> {
@@ -41,6 +41,28 @@ fn run(args: &[String]) -> Result<String, String> {
                 lab1.delta_e76(lab2),
                 lab1.delta_e2000(lab2)
             ))
+        }
+        [cmd, hex1, hex2, n] if cmd == "palette" => {
+            let steps: usize = n.parse().map_err(|e| format!("bad step count {:?}: {}", n, e))?;
+            if !(2..=256).contains(&steps) {
+                return Err("step count must be between 2 and 256".to_string());
+            }
+            let from = Rgb::from_hex(hex1)?.to_xyz().to_lab();
+            let to = Rgb::from_hex(hex2)?.to_xyz().to_lab();
+            let mut clipped = false;
+            let lines: Vec<String> = palette(from, to, steps)
+                .into_iter()
+                .map(|lab| {
+                    let rgb = lab.to_xyz().to_rgb();
+                    clipped |= rgb.is_out_of_gamut();
+                    rgb.to_hex()
+                })
+                .collect();
+            let mut out = lines.join("\n");
+            if clipped {
+                out.push_str("\nwarning: some steps fall outside sRGB gamut and were clipped");
+            }
+            Ok(out)
         }
         _ => Err(usage()),
     }

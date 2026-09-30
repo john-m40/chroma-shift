@@ -266,6 +266,15 @@ impl Lab {
         }
     }
 
+    /// Straight-line blend in Lab, `t` = 0.0 gives `self`, 1.0 gives `other`.
+    pub fn lerp(self, other: Lab, t: f64) -> Lab {
+        Lab {
+            l: self.l + (other.l - self.l) * t,
+            a: self.a + (other.a - self.a) * t,
+            b: self.b + (other.b - self.b) * t,
+        }
+    }
+
     /// Perceptual distance (CIE76 dE). Cheap: just Euclidean distance in Lab.
     /// Good enough for small differences, but it doesn't correct for the
     /// eye's uneven sensitivity across hue and chroma the way dE2000 does.
@@ -359,9 +368,48 @@ impl Lab {
     }
 }
 
+/// `steps` colours from `from` to `to` inclusive, evenly spaced along the
+/// straight line between them in Lab. Because Lab distance is what dE76
+/// measures, every neighbouring pair in the ramp is the same dE76 apart;
+/// interpolating in sRGB or HSL would bunch the steps up unevenly instead.
+/// One step returns just `from`; zero returns an empty ramp.
+pub fn palette(from: Lab, to: Lab, steps: usize) -> Vec<Lab> {
+    match steps {
+        0 => Vec::new(),
+        1 => vec![from],
+        _ => (0..steps)
+            .map(|i| from.lerp(to, i as f64 / (steps - 1) as f64))
+            .collect(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn palette_hits_endpoints_with_even_steps() {
+        let from = Rgb::from_hex("#3366cc").unwrap().to_xyz().to_lab();
+        let to = Rgb::from_hex("#ffcc00").unwrap().to_xyz().to_lab();
+        let ramp = palette(from, to, 7);
+        assert_eq!(ramp.len(), 7);
+        assert_eq!(ramp[0], from);
+        assert!(ramp[6].delta_e76(to) < 1e-9);
+
+        let gap = ramp[0].delta_e76(ramp[1]);
+        for pair in ramp.windows(2) {
+            assert!((pair[0].delta_e76(pair[1]) - gap).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn palette_handles_tiny_sizes() {
+        let a = Lab { l: 20.0, a: 0.0, b: 0.0 };
+        let b = Lab { l: 80.0, a: 10.0, b: -10.0 };
+        assert!(palette(a, b, 0).is_empty());
+        assert_eq!(palette(a, b, 1), vec![a]);
+        assert_eq!(palette(a, b, 2), vec![a, b]);
+    }
 
     #[test]
     fn white_round_trips() {

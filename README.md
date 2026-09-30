@@ -59,6 +59,10 @@ delta-E76:   53.584
 delta-E2000: 39.934
 ```
 
+`palette <hex> <hex> <n>` prints n hex colours, one per line, from the first
+colour to the second, with equal Lab distance between neighbours. The library
+equivalent is `chroma_shift::palette(from_lab, to_lab, n)`.
+
 `diff` reports both dE76 and dE2000. dE76 is plain Euclidean distance in
 Lab. dE2000 weights that distance by lightness, chroma and hue instead of
 treating them as interchangeable, so it tracks perceived difference better
@@ -81,5 +85,7 @@ First cut. Handles sRGB/XYZ/Lab round trips, both CIE76 and CIEDE2000
 delta-E, HSL/HSV conversions, and warns on the CLI when a Lab colour falls
 outside the sRGB gamut. `from_hex` accepts `#rgb`, `#rrggbb` and
 `#rrggbbaa` - the alpha byte is validated but dropped, since nothing in
-the colour model carries transparency through. Still missing: a palette
-command for perceptually even colour ramps.
+the colour model carries transparency through. `palette` builds ramps
+between two colours with equal dE76 spacing. Ramps are straight lines in
+Lab, so they can occasionally leave the sRGB gamut between in-gamut
+endpoints; the CLI warns when that happens.
